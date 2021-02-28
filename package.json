@@ -1,11 +1,7 @@
 {
-  "name": "react-native-drax",
+  "name": "@trava/react-native-drax",
   "version": "0.7.2",
   "description": "A drag-and-drop system for React Native",
-  "repository": {
-    "type": "git",
-    "url": "git+ssh://git@github.com/nuclearpasta/react-native-drax.git"
-  },
   "main": "build/index.js",
   "types": "build/index.d.ts",
   "scripts": {
@@ -13,7 +9,6 @@
     "build": "yarn run tsc",
     "prepublish": "yarn run build"
   },
-  "author": "Joe Lafiosca <joe@proxicoach.com>",
   "license": "MIT",
   "dependencies": {
     "lodash.isequal": "^4.5.0",
