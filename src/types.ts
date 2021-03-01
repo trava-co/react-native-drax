@@ -663,9 +663,9 @@ export interface DraxParentView {
 	id: string;
 	/** Ref to node handle of the parent, for measuring relative to */
 	nodeHandleRef: RefObject<number | null>;
-	containerScrollPosition: Position;
-	dragExitedContainer: boolean;
-	containerAutoScrollId: NodeJS.Timeout | undefined;
+	containerScrollPosition?: Position;
+	dragExitedContainer?: boolean;
+	containerAutoScrollId?: NodeJS.Timeout | undefined;
 }
 
 /** Type augmentation to allow an animated value */
@@ -838,7 +838,7 @@ export interface DraxListDraggedItemData<TItem> {
 	/* The list index of the item that is being dragged */
 	index: number;
 	/* The item that is being dragged (or undefined if data is not found) */
-	item?: TItem;
+	item?: TItem | { id: number };
 }
 
 /** Event data for when a list item reorder drag action begins */
@@ -864,17 +864,17 @@ export interface DraxListOnItemDragEndEventData<TItem>
 	/* The list index of the item it was moved onto, if any */
 	toIndex?: number;
 	/* The item it was moved onto, if */
-	toItem?: TItem;
+	toItem?: TItem | { id: number };
 }
 
 /** Event data for when an item is released in a new position within a DraxList, reordering the list */
 export interface DraxListOnItemReorderEventData<TItem> {
 	/* The item that was moved */
-	fromItem: TItem;
+	fromItem: TItem | { id: number };
 	/* The list index of the item that was moved */
 	fromIndex: number;
 	/* The item it was moved onto */
-	toItem: TItem;
+	toItem: TItem | { id: number };
 	/* The list index of the item it was moved onto */
 	toIndex: number;
 }

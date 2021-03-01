@@ -860,8 +860,10 @@ export const DraxList = <T extends unknown>({
 						setOriginalIndexes(newOriginalIndexes);
 						onItemReorder?.({
 							fromIndex,
+							// @ts-ignore
 							fromItem: dataUpdated[fromOriginalIndex],
 							toIndex: toIndex! - 1,
+							// @ts-ignore
 							toItem: dataUpdated[toOriginalIndex - 1],
 						});
 					}
