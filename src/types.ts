@@ -1,4 +1,4 @@
-import { RefObject, ReactNode } from "react";
+import { RefObject, ReactNode } from 'react';
 import {
 	ViewProps,
 	Animated,
@@ -7,14 +7,14 @@ import {
 	StyleProp,
 	ScrollViewProps,
 	ListRenderItemInfo,
-} from "react-native";
+} from 'react-native';
 import {
 	LongPressGestureHandlerStateChangeEvent,
 	GestureHandlerGestureEvent,
 	GestureHandlerGestureEventNativeEvent,
 	LongPressGestureHandlerEventExtra,
-} from "react-native-gesture-handler";
-import { PayloadActionCreator, ActionType } from "typesafe-actions";
+} from 'react-native-gesture-handler';
+import { PayloadActionCreator, ActionType } from 'typesafe-actions';
 
 /** Workaround for incorrect typings. See: https://github.com/kmagiera/react-native-gesture-handler/pull/860/files */
 export interface LongPressGestureHandlerGestureEvent
@@ -24,10 +24,10 @@ export interface LongPressGestureHandlerGestureEvent
 }
 
 /** Gesture state change event expected by Drax handler */
-export type DraxGestureStateChangeEvent = LongPressGestureHandlerStateChangeEvent["nativeEvent"];
+export type DraxGestureStateChangeEvent = LongPressGestureHandlerStateChangeEvent['nativeEvent'];
 
 /** Gesture event expected by Drax handler */
-export type DraxGestureEvent = LongPressGestureHandlerGestureEvent["nativeEvent"];
+export type DraxGestureEvent = LongPressGestureHandlerGestureEvent['nativeEvent'];
 
 /** An xy-coordinate position value */
 export interface Position {
@@ -39,10 +39,10 @@ export interface Position {
 
 /** Predicate for checking if something is a Position */
 export const isPosition = (something: any): something is Position =>
-	typeof something === "object" &&
+	typeof something === 'object' &&
 	something !== null &&
-	typeof something.x === "number" &&
-	typeof something.y === "number";
+	typeof something.x === 'number' &&
+	typeof something.y === 'number';
 
 /** Dimensions of a view */
 export interface ViewDimensions {
@@ -107,9 +107,9 @@ export interface WithCancelledFlag {
 export const isWithCancelledFlag = (
 	something: any
 ): something is WithCancelledFlag =>
-	typeof something === "object" &&
+	typeof something === 'object' &&
 	something !== null &&
-	typeof something.cancelled === "boolean";
+	typeof something.cancelled === 'boolean';
 
 /** Data about a Drax drag end event */
 export interface DraxDragEndEventData
@@ -143,7 +143,7 @@ export interface DraxMonitorEventData extends DraxDragEventData {
 	/** Event position/dimensions ratio relative to the monitor */
 	monitorOffsetRatio: Position;
 	// RN added
-	draggedDimensions: DraxViewMeasurements;
+	draggedDimensions: ViewDimensions;
 }
 
 /** Data about a Drax monitor drag end event */
@@ -162,7 +162,10 @@ export enum DraxSnapbackTargetPreset {
 }
 
 /** Target for snapback hover view release animation: none, default, or specified Position */
-export type DraxSnapbackTarget = DraxSnapbackTargetPreset | Position;
+export interface DraxSnapbackTarget {
+	target: DraxSnapbackTargetPreset | Position;
+	callback?: () => void;
+}
 
 /**
  * Response type for Drax protocol callbacks involving end of a drag,
@@ -309,7 +312,7 @@ export interface DraxProtocol {
 
 /** Props for components implementing the protocol */
 export interface DraxProtocolProps
-	extends Partial<Omit<DraxProtocol, "internalRenderHoverView">> {
+	extends Partial<Omit<DraxProtocol, 'internalRenderHoverView'>> {
 	/** Convenience prop to provide one value for both `dragPayload` and `receiverPayload` */
 	payload?: any;
 }
@@ -346,8 +349,8 @@ export interface DraxViewData {
 
 /** Information about a view, plus its clipped absolute measurements */
 export interface DraxAbsoluteViewData
-	extends Omit<DraxViewData, "measurements">,
-		Required<Pick<DraxViewData, "measurements">> {
+	extends Omit<DraxViewData, 'measurements'>,
+		Required<Pick<DraxViewData, 'measurements'>> {
 	/** Absolute measurements for view */
 	absoluteMeasurements: DraxViewMeasurements;
 }
@@ -545,19 +548,19 @@ export interface UpdateTrackingStatusPayload
 /** Collection of Drax state action creators */
 export interface DraxStateActionCreators {
 	createViewState: PayloadActionCreator<
-		"createViewState",
+		'createViewState',
 		CreateViewStatePayload
 	>;
 	updateViewState: PayloadActionCreator<
-		"updateViewState",
+		'updateViewState',
 		UpdateViewStatePayload
 	>;
 	deleteViewState: PayloadActionCreator<
-		"deleteViewState",
+		'deleteViewState',
 		DeleteViewStatePayload
 	>;
 	updateTrackingStatus: PayloadActionCreator<
-		"updateTrackingStatus",
+		'updateTrackingStatus',
 		UpdateTrackingStatusPayload
 	>;
 }
@@ -623,11 +626,23 @@ export interface DraxContextValue {
 
 	/** Drax parent view for all views under this context, when nesting */
 	parent?: DraxParentView;
+
+	getTrackingDragged: () =>
+		| {
+				tracking: DraxTrackingDrag;
+				id: string;
+				data: DraxAbsoluteViewData;
+		  }
+		| undefined;
+
+	containerId: string | undefined;
 }
 
 /** Optional props that can be passed to a DraxProvider to modify its behavior */
 export interface DraxProviderProps {
 	debug?: boolean;
+	clampDrag?: boolean;
+	multiDimensionalScroll?: boolean;
 }
 
 /** Props that are passed to a DraxSubprovider, used internally for nesting views */
@@ -648,6 +663,9 @@ export interface DraxParentView {
 	id: string;
 	/** Ref to node handle of the parent, for measuring relative to */
 	nodeHandleRef: RefObject<number | null>;
+	containerScrollPosition: Position;
+	dragExitedContainer: boolean;
+	containerAutoScrollId: NodeJS.Timeout | undefined;
 }
 
 /** Type augmentation to allow an animated value */
@@ -672,7 +690,7 @@ export type AnimatedViewStyle = AnimatedStyle<ViewStyle>;
 export type AnimatedViewStyleProp = StyleProp<AnimatedViewStyle>;
 
 /** Helper type for coercing the output of Animated.ValueXY.getTranslateTransform() */
-export type AnimatedTransform = AnimatedStyle<ViewStyle["transform"]>;
+export type AnimatedTransform = AnimatedStyle<ViewStyle['transform']>;
 
 /** Function that receives a Drax view measurement */
 export interface DraxViewMeasurementHandler {
@@ -742,7 +760,7 @@ export interface DraxViewRenderHoverContent {
 
 /** Props for a DraxView; combines protocol props and standard view props */
 export interface DraxViewProps
-	extends Omit<ViewProps, "style">,
+	extends Omit<ViewProps, 'style'>,
 		DraxProtocolProps,
 		DraxViewStyleProps {
 	/** Custom render function for content of this view */
@@ -812,6 +830,7 @@ export interface DraxScrollViewProps
 		DraxAutoScrollProps {
 	/** Unique drax view id, auto-generated if omitted */
 	id?: string;
+	isContainer?: boolean;
 }
 
 /** DraxList item being dragged */
@@ -880,7 +899,7 @@ export interface DraxListOnItemReorder<TItem> {
 
 /** Props for a DraxList; extends standard FlatList props */
 export interface DraxListProps<TItem>
-	extends Omit<FlatListProps<TItem>, "renderItem">,
+	extends Omit<FlatListProps<TItem>, 'renderItem'>,
 		DraxAutoScrollProps {
 	/** Unique drax view id, auto-generated if omitted */
 	id?: string;

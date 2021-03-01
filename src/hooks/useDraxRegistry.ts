@@ -1,7 +1,7 @@
-import { useCallback, useRef, useMemo, useEffect } from "react";
-import { Animated } from "react-native";
+import { useCallback, useRef, useMemo, useEffect } from 'react';
+import { Animated } from 'react-native';
 
-import { actions } from "./useDraxState";
+import { actions } from './useDraxState';
 import {
 	DraxRegistry,
 	DraxViewDragStatus,
@@ -24,15 +24,15 @@ import {
 	DraxSnapbackTarget,
 	DraxSnapbackTargetPreset,
 	isPosition,
-} from "../types";
+} from '../types';
 import {
 	clipMeasurements,
 	isPointInside,
 	getRelativePosition,
 	extractDimensions,
 	generateRandomId,
-} from "../math";
-import { defaultSnapbackDelay, defaultSnapbackDuration } from "../params";
+} from '../math';
+import { defaultSnapbackDelay, defaultSnapbackDuration } from '../params';
 
 /*
  * The registry functions mutate their registry parameter, so let's
@@ -145,12 +145,17 @@ const getAbsoluteViewDataFromRegistry = (
 /** Convenience function to return a view's id and absolute data. */
 const getAbsoluteViewEntryFromRegistry = (
 	registry: DraxRegistry,
-	id: string | undefined
+	id: string | undefined,
+	multiDimensionalScroll: boolean
 ): DraxAbsoluteViewEntry | undefined => {
 	if (id === undefined) {
 		return undefined;
 	}
-	const data = getAbsoluteViewDataFromRegistry(registry, id);
+	const data = getAbsoluteViewDataFromRegistry(
+		registry,
+		id,
+		multiDimensionalScroll
+	);
 	return data && { id, data };
 };
 
@@ -239,12 +244,16 @@ const findMonitorsAndReceiverInRegistry = (
 };
 
 /** Get id and data for the currently dragged view, if any. */
-const getTrackingDraggedFromRegistry = (registry: DraxRegistry) => {
+const getTrackingDraggedFromRegistry = (
+	registry: DraxRegistry,
+	multiDimensionalScroll: boolean
+) => {
 	const tracking = registry.drag;
 	if (tracking !== undefined) {
 		const viewEntry = getAbsoluteViewEntryFromRegistry(
 			registry,
-			tracking.draggedId
+			tracking.draggedId,
+			multiDimensionalScroll
 		);
 		if (viewEntry !== undefined) {
 			return {
@@ -257,12 +266,16 @@ const getTrackingDraggedFromRegistry = (registry: DraxRegistry) => {
 };
 
 /** Get id and data for the currently receiving view, if any. */
-const getTrackingReceiverFromRegistry = (registry: DraxRegistry) => {
+const getTrackingReceiverFromRegistry = (
+	registry: DraxRegistry,
+	multiDimensionalScroll: boolean
+) => {
 	const tracking = registry.drag?.receiver;
 	if (tracking !== undefined) {
 		const viewEntry = getAbsoluteViewEntryFromRegistry(
 			registry,
-			tracking.receiverId
+			tracking.receiverId,
+			multiDimensionalScroll
 		);
 		if (viewEntry !== undefined) {
 			return {
@@ -279,13 +292,21 @@ const getTrackingMonitorIdsFromRegistry = (registry: DraxRegistry) =>
 	registry.drag?.monitorIds || [];
 
 /** Get id and data for all currently monitoring views. */
-const getTrackingMonitorsFromRegistry = (registry: DraxRegistry) =>
+const getTrackingMonitorsFromRegistry = (
+	registry: DraxRegistry,
+	multiDimensionalScroll: boolean
+) =>
 	registry.drag?.monitorIds
-		.map((id) => getAbsoluteViewEntryFromRegistry(registry, id))
+		.map((id) =>
+			getAbsoluteViewEntryFromRegistry(registry, id, multiDimensionalScroll)
+		)
 		.filter((value): value is DraxAbsoluteViewEntry => !!value) || [];
 
 /** Get the array of hover items for dragged and released views */
-const getHoverItemsFromRegistry = (registry: DraxRegistry) => {
+const getHoverItemsFromRegistry = (
+	registry: DraxRegistry,
+	multiDimensionalScroll: boolean
+) => {
 	const hoverItems = [];
 
 	// Find all released view hover items, in order from oldest to newest.
@@ -295,7 +316,8 @@ const getHoverItemsFromRegistry = (registry: DraxRegistry) => {
 			const { viewId, hoverPosition } = release;
 			const releasedData = getAbsoluteViewDataFromRegistry(
 				registry,
-				viewId
+				viewId,
+				multiDimensionalScroll
 			);
 			if (releasedData) {
 				const {
@@ -317,7 +339,7 @@ const getHoverItemsFromRegistry = (registry: DraxRegistry) => {
 
 	// Find the currently dragged hover item.
 	const { id: draggedId, data: draggedData } =
-		getTrackingDraggedFromRegistry(registry) ?? {};
+		getTrackingDraggedFromRegistry(registry, multiDimensionalScroll) ?? {};
 	if (draggedData) {
 		const {
 			protocol: { internalRenderHoverView },
@@ -478,7 +500,10 @@ const deleteReleaseInRegistry = (registry: DraxRegistry, releaseId: string) => {
 /** Reset drag tracking, if any. */
 const resetDragInRegistry = (
 	registry: DraxRegistry,
-	snapbackTarget: DraxSnapbackTarget = DraxSnapbackTargetPreset.Default
+	snapbackTarget: DraxSnapbackTarget = {
+		target: DraxSnapbackTargetPreset.Default,
+	},
+	multiDimensionalScroll: boolean
 ) => {
 	const { drag, stateDispatch } = registry;
 
@@ -490,7 +515,11 @@ const resetDragInRegistry = (
 
 	const { draggedId, hoverPosition } = drag;
 
-	const draggedData = getAbsoluteViewDataFromRegistry(registry, draggedId);
+	const draggedData = getAbsoluteViewDataFromRegistry(
+		registry,
+		draggedId,
+		multiDimensionalScroll
+	);
 
 	// Clear the drag.
 	// console.log('clearing drag');
@@ -498,10 +527,7 @@ const resetDragInRegistry = (
 
 	// Determine if/where/how to snapback.
 	let snapping = false;
-	if (
-		snapbackTarget.target !== DraxSnapbackTargetPreset.None &&
-		draggedData
-	) {
+	if (snapbackTarget.target !== DraxSnapbackTargetPreset.None && draggedData) {
 		const {
 			internalRenderHoverView,
 			onSnapbackEnd,
@@ -615,10 +641,17 @@ const startDragInRegistry = (
 		draggedId,
 		grabOffset,
 		grabOffsetRatio,
-	}: StartDragPayload
+	}: StartDragPayload,
+	multiDimensionalScroll: boolean
 ) => {
 	const { stateDispatch } = registry;
-	resetDragInRegistry(registry);
+	resetDragInRegistry(
+		registry,
+		{
+			target: DraxSnapbackTargetPreset.Default,
+		},
+		multiDimensionalScroll
+	);
 	const dragTranslation = { x: 0, y: 0 };
 	const dragTranslationRatio = { x: 0, y: 0 };
 	const dragOffset = grabOffset;
@@ -668,14 +701,16 @@ const startDragInRegistry = (
 /** Update drag position. */
 const updateDragPositionInRegistry = (
 	registry: DraxRegistry,
-	dragAbsolutePosition: Position
+	dragAbsolutePosition: Position,
+	multiDimensionalScroll: boolean
 ) => {
 	const { drag, stateDispatch } = registry;
 	if (!drag) {
 		return;
 	}
 	const { absoluteMeasurements } =
-		getTrackingDraggedFromRegistry(registry)?.data ?? {};
+		getTrackingDraggedFromRegistry(registry, multiDimensionalScroll)?.data ??
+		{};
 	if (!absoluteMeasurements) {
 		return;
 	}
@@ -802,13 +837,18 @@ const setMonitorIdsInRegistry = (
 /** Unregister a Drax view. */
 const unregisterViewInRegistry = (
 	registry: DraxRegistry,
-	{ id }: UnregisterViewPayload
+	{ id }: UnregisterViewPayload,
+	multiDimensionalScroll: boolean
 ) => {
 	const { [id]: removed, ...viewDataById } = registry.viewDataById;
 	registry.viewIds = registry.viewIds.filter((thisId) => thisId !== id);
 	registry.viewDataById = viewDataById;
 	if (registry.drag?.draggedId === id) {
-		resetDragInRegistry(registry);
+		resetDragInRegistry(
+			registry,
+			{ target: DraxSnapbackTargetPreset.Default },
+			multiDimensionalScroll
+		);
 	} else if (registry.drag?.receiver?.receiverId === id) {
 		resetReceiverInRegistry(registry);
 	}
@@ -849,19 +889,27 @@ export const useDraxRegistry = (
 				id,
 				multiDimensionalScroll
 			),
-		[]
+		[multiDimensionalScroll]
 	);
 
 	/** Get id and data for the currently dragged view, if any. */
 	const getTrackingDragged = useCallback(
-		() => getTrackingDraggedFromRegistry(registryRef.current),
-		[]
+		() =>
+			getTrackingDraggedFromRegistry(
+				registryRef.current,
+				multiDimensionalScroll
+			),
+		[multiDimensionalScroll]
 	);
 
 	/** Get id and data for the currently receiving view, if any. */
 	const getTrackingReceiver = useCallback(
-		() => getTrackingReceiverFromRegistry(registryRef.current),
-		[]
+		() =>
+			getTrackingReceiverFromRegistry(
+				registryRef.current,
+				multiDimensionalScroll
+			),
+		[multiDimensionalScroll]
 	);
 
 	/** Get ids for all currently monitoring views. */
@@ -872,8 +920,12 @@ export const useDraxRegistry = (
 
 	/** Get id and data for all currently monitoring views. */
 	const getTrackingMonitors = useCallback(
-		() => getTrackingMonitorsFromRegistry(registryRef.current),
-		[]
+		() =>
+			getTrackingMonitorsFromRegistry(
+				registryRef.current,
+				multiDimensionalScroll
+			),
+		[multiDimensionalScroll]
 	);
 
 	/**
@@ -902,13 +954,14 @@ export const useDraxRegistry = (
 				excludeViewId,
 				multiDimensionalScroll
 			),
-		[]
+		[multiDimensionalScroll]
 	);
 
 	/** Get the array of hover items for dragged and released views */
 	const getHoverItems = useCallback(
-		() => getHoverItemsFromRegistry(registryRef.current),
-		[]
+		() =>
+			getHoverItemsFromRegistry(registryRef.current, multiDimensionalScroll),
+		[multiDimensionalScroll]
 	);
 
 	/**
@@ -953,15 +1006,19 @@ export const useDraxRegistry = (
 	/** Reset drag tracking, if any. */
 	const resetDrag = useCallback(
 		(snapbackTarget?: DraxSnapbackTarget) =>
-			resetDragInRegistry(registryRef.current, snapbackTarget),
-		[]
+			resetDragInRegistry(
+				registryRef.current,
+				snapbackTarget,
+				multiDimensionalScroll
+			),
+		[multiDimensionalScroll]
 	);
 
 	/** Start tracking a drag. */
 	const startDrag = useCallback(
 		(payload: StartDragPayload) =>
-			startDragInRegistry(registryRef.current, payload),
-		[]
+			startDragInRegistry(registryRef.current, payload, multiDimensionalScroll),
+		[multiDimensionalScroll]
 	);
 
 	/** Update drag position. */
@@ -969,17 +1026,16 @@ export const useDraxRegistry = (
 		(dragAbsolutePosition: Position) =>
 			updateDragPositionInRegistry(
 				registryRef.current,
-				dragAbsolutePosition
+				dragAbsolutePosition,
+				multiDimensionalScroll
 			),
-		[]
+		[multiDimensionalScroll]
 	);
 
 	/** Update the receiver for a drag. */
 	const updateReceiver = useCallback(
-		(
-			receiver: DraxFoundAbsoluteViewEntry,
-			dragged: DraxAbsoluteViewEntry
-		) => updateReceiverInRegistry(registryRef.current, receiver, dragged),
+		(receiver: DraxFoundAbsoluteViewEntry, dragged: DraxAbsoluteViewEntry) =>
+			updateReceiverInRegistry(registryRef.current, receiver, dragged),
 		[]
 	);
 
@@ -993,8 +1049,12 @@ export const useDraxRegistry = (
 	/** Unregister a Drax view. */
 	const unregisterView = useCallback(
 		(payload: UnregisterViewPayload) =>
-			unregisterViewInRegistry(registryRef.current, payload),
-		[]
+			unregisterViewInRegistry(
+				registryRef.current,
+				payload,
+				multiDimensionalScroll
+			),
+		[multiDimensionalScroll]
 	);
 
 	/** Create the Drax registry object for return, only replacing reference when necessary. */

@@ -3,17 +3,18 @@ import React, {
 	useRef,
 	useCallback,
 	useEffect,
-} from "react";
+	useState,
+} from 'react';
 import {
 	ScrollView,
 	NativeSyntheticEvent,
 	NativeScrollEvent,
 	findNodeHandle,
-} from "react-native";
+} from 'react-native';
 
-import { DraxView } from "./DraxView";
-import { DraxSubprovider } from "./DraxSubprovider";
-import { useDraxContext, useDraxId } from "./hooks";
+import { DraxView } from './DraxView';
+import { DraxSubprovider } from './DraxSubprovider';
+import { useDraxContext, useDraxId } from './hooks';
 import {
 	DraxScrollViewProps,
 	AutoScrollDirection,
@@ -21,14 +22,14 @@ import {
 	Position,
 	DraxViewMeasurements,
 	DraxMonitorEventData,
-} from "./types";
+} from './types';
 import {
 	defaultAutoScrollIntervalLength,
 	defaultAutoScrollJumpRatio,
 	defaultAutoScrollBackThreshold,
 	defaultAutoScrollForwardThreshold,
 	defaultScrollEventThrottle,
-} from "./params";
+} from './params';
 
 export const DraxScrollView = ({
 	children,
