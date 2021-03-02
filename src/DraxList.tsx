@@ -18,6 +18,7 @@ import {
 	StyleSheet,
 	LayoutAnimation,
 	View,
+	Platform,
 } from 'react-native';
 
 import { DraxView } from './DraxView';
@@ -119,6 +120,10 @@ export const DraxList = <T extends unknown>({
 		height: number;
 		width: number;
 	}>();
+	// Used to imperatively control scroll bar for android
+	const [scrollTo, setScrollTo] = useState<'start' | 'end' | undefined>(
+		undefined
+	);
 
 	// if dummyItem prop is true, then append an object to our data array
 	const dataUpdated = useMemo(() => {
@@ -129,8 +134,21 @@ export const DraxList = <T extends unknown>({
 	// Get the item count for internal use.
 	const itemCount = dataUpdated?.length ?? 0;
 
+	// Android only, bug fix: imperatively control scroll bar when last item is visibly moved
+	useEffect(() => {
+		if (scrollTo && Platform.OS === 'android') {
+			if (scrollTo === 'end') {
+				flatListRef.current!.scrollToEnd({ animated: true });
+			} else if (scrollTo === 'start') {
+				flatListRef.current!.scrollToIndex({ index: 0 });
+			}
+		}
+	}, [itemCount, scrollTo, showDummy]);
+
 	// Adjust measurements, registrations, and shift value arrays as item count changes.
 	useEffect(() => {
+		// reset state variable for android imperative scroll bux-fix
+		setScrollTo(undefined);
 		// if # of items have changed, setShowDummy false (covers reset on success cases)
 		setShowDummy(false);
 		const itemMeasurements = itemMeasurementsRef.current;
@@ -246,7 +264,7 @@ export const DraxList = <T extends unknown>({
 
 					// where scrollPosition is 0
 					if (scrollPosition === 0) {
-						console.log('case 1');
+						// console.log('case 1');
 						if (index > displacedIndex) {
 							newTargetValue = -displacedLength;
 						}
@@ -257,7 +275,7 @@ export const DraxList = <T extends unknown>({
 						if (scrollPosition < displacedLength) {
 							// if we cannot see last item, then maintain scrollPosition
 							if (!lastItemVisible) {
-								console.log('case 2a-i');
+								// console.log('case 2a-i');
 								// maintain scrollPosition by shifting rightPartition left
 								if (index > displacedIndex) {
 									newTargetValue = -displacedLength;
@@ -265,28 +283,50 @@ export const DraxList = <T extends unknown>({
 							}
 							// if removing the item means our total content will be <= one container, dual shift
 							else if (contentLength - displacedLength <= containerLength) {
-								console.log('case 2a-ii');
-
-								// if right of displaced tile, move left
-								if (index > displacedIndex) {
-									newTargetValue = -displacedLength + scrollPosition;
+								if (Platform.OS === 'ios') {
+									// console.log('case 2a-ii ios');
+									// if right of displaced tile, move left
+									if (index > displacedIndex) {
+										newTargetValue = -displacedLength + scrollPosition;
+									}
+									// if left of displaced tile, move right
+									if (index < displacedIndex) {
+										newTargetValue = scrollPosition;
+									}
 								}
-								// if left of displaced tile, move right
-								if (index < displacedIndex) {
-									newTargetValue = scrollPosition;
+								// if Android
+								else {
+									// console.log('case 2a-ii android');
+									// if right of displaced tile, move left
+									if (index > displacedIndex) {
+										newTargetValue = -displacedLength;
+										if (index === itemCount - 1) {
+											setScrollTo('start');
+										}
+									}
 								}
 							}
 							// if we can see last item, and removing the displaced item won't reduce contentSize to <= one container
 							else {
-								console.log('case 2a-iii');
-								// dual shifts must offset displacedLength
-								// if right of displaced tile, move left
-								if (index > displacedIndex) {
-									newTargetValue = rightListShift;
-								}
-								// if left of displaced tile, move right
-								if (index < displacedIndex) {
-									newTargetValue = leftListShift;
+								if (Platform.OS === 'ios') {
+									// console.log('case 2a-iii ios');
+									// dual shifts must offset displacedLength
+									// if right of displaced tile, move left
+									if (index > displacedIndex) {
+										newTargetValue = rightListShift;
+									}
+									// if left of displaced tile, move right
+									if (index < displacedIndex) {
+										newTargetValue = leftListShift;
+									}
+								} else {
+									// console.log('case 2a-iii android');
+									if (index > displacedIndex) {
+										newTargetValue = -displacedLength;
+									}
+									if (index === itemCount - 1) {
+										setScrollTo('end');
+									}
 								}
 							}
 						}
@@ -294,18 +334,30 @@ export const DraxList = <T extends unknown>({
 						else {
 							// if we can see the last item, dual shift
 							if (lastItemVisible) {
-								console.log('case 3a');
-								// dual shifts must offset displacedLength
-								if (index > displacedIndex) {
-									newTargetValue = rightListShift;
-								}
-								if (index < displacedIndex) {
-									newTargetValue = leftListShift;
+								if (Platform.OS === 'ios') {
+									// console.log('case 3a ios');
+									// dual shifts must offset displacedLength
+									if (index > displacedIndex) {
+										newTargetValue = rightListShift;
+									}
+									if (index < displacedIndex) {
+										newTargetValue = leftListShift;
+									}
+								} else {
+									// console.log('case 3a android');
+									if (index > displacedIndex) {
+										newTargetValue = -displacedLength;
+									}
+									if (index === itemCount - 1) {
+										contentLength - displacedLength > containerLength
+											? setScrollTo('end')
+											: setScrollTo('start');
+									}
 								}
 							} else {
 								// if we can't see last item, and scrollPosition > displacement
 								// if right of displaced tile, move left
-								console.log('case 3b');
+								// console.log('case 3b');
 								if (index > displacedIndex) {
 									newTargetValue = -displacedLength;
 								}
@@ -338,14 +390,29 @@ export const DraxList = <T extends unknown>({
 
 	// animation to hideDummy smoothly. triggered when item enters this list and then exits.
 	const hideDummy = useCallback(() => {
-		const animation = LayoutAnimation.create(
-			250,
-			LayoutAnimation.Types.easeInEaseOut,
-			LayoutAnimation.Properties.opacity
-		);
-		LayoutAnimation.configureNext(animation);
-		setShowDummy(false);
-	}, []);
+		if (Platform.OS === 'android') {
+			const contentLength = horizontal
+				? contentSizeRef.current!.x
+				: contentSizeRef.current!.y;
+			const containerLength = horizontal
+				? containerMeasurementsRef.current!.width
+				: containerMeasurementsRef.current!.height;
+
+			contentLength > containerLength
+				? setScrollTo('end')
+				: setScrollTo('start');
+			setShowDummy(false);
+			return;
+		} else {
+			const animation = LayoutAnimation.create(
+				250,
+				LayoutAnimation.Types.easeInEaseOut,
+				LayoutAnimation.Properties.opacity
+			);
+			LayoutAnimation.configureNext(animation);
+			setShowDummy(false);
+		}
+	}, [horizontal]);
 
 	const handleDragEnd = useCallback(() => {
 		// console.log('resetting interval id', containerAutoScrollId)
