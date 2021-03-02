@@ -213,12 +213,12 @@ export const DraxList = <T extends unknown>({
 	}, []);
 
 	const shiftBeforeListShrinks = useCallback(
-		(childIndex) => {
-			if (childIndex >= 0) {
+		(displacedIndex) => {
+			if (displacedIndex >= 0) {
 				const scrollPosition = horizontal
 					? scrollPositionRef.current.x
 					: scrollPositionRef.current.y;
-
+				// console.log('scrollPosition:', scrollPosition);
 				const contentLength = horizontal
 					? contentSizeRef.current!.x
 					: contentSizeRef.current!.y;
@@ -226,109 +226,92 @@ export const DraxList = <T extends unknown>({
 					? containerMeasurementsRef.current!.width
 					: containerMeasurementsRef.current!.height;
 				const itemSizes = itemMeasurementsRef.current;
+				const lastItemPosition = itemSizes[itemCount - 1 - dummyItem]!.x;
+				const lastItemVisible =
+					scrollPosition + containerLength >= lastItemPosition;
+
+				const displacedLength = horizontal
+					? itemSizes[displacedIndex]!.width
+					: itemSizes[displacedIndex]!.height;
+
+				// these shifts are used in cases 2a-iii & 3a,
+				// where last item is visible & removing item won't reduce contentSize to <= one container
+				// this algorithm splits the displaced width in two: one for rightList, rest for leftList
+				const rightListShift = scrollPosition + containerLength - contentLength;
+				const leftListShift = rightListShift + displacedLength;
 
 				originalIndexes.forEach((originalIndex, index) => {
 					const shift = shiftsRef.current[originalIndex];
-
-					const itemLength = horizontal
-						? itemSizes[originalIndex]!.width
-						: itemSizes[originalIndex]!.height;
-					// console.log('itemLength:', itemLength)
 					let newTargetValue = 0;
 
 					// where scrollPosition is 0
 					if (scrollPosition === 0) {
-						// console.log('case 1')
-						if (index > childIndex) {
-							newTargetValue = -itemLength;
+						console.log('case 1');
+						if (index > displacedIndex) {
+							newTargetValue = -displacedLength;
 						}
 					}
 					// else: scrollPosition > 0
 					else {
-						// console.log('scrollPosition:', scrollPosition)
-						// console.log('case 2')
-
-						// if the sum of lengths of all items is > one screen, maintain scrollPosition, shifting items after selected left/up
-						// if sum of lengths of all items is < one screen, shift both before & after
-
-						// where 0 < scrollPosition < itemLength
-						if (scrollPosition < itemLength) {
-							// console.log('case 2a')
-
-							if (
-								contentLength - itemLength - scrollPosition >
-								containerLength
-							) {
-								// this case always applies when we have 5 items left, sometimes when 4 items left
-								// console.log('case 2a-i')
-								// maintain scrollPosition
-								if (index > childIndex) {
-									newTargetValue = -itemLength;
+						// if scrollPosition is less than displacedLength (but greater than 0)
+						if (scrollPosition < displacedLength) {
+							// if we cannot see last item, then maintain scrollPosition
+							if (!lastItemVisible) {
+								console.log('case 2a-i');
+								// maintain scrollPosition by shifting rightPartition left
+								if (index > displacedIndex) {
+									newTargetValue = -displacedLength;
 								}
-							} else if (contentLength - itemLength <= containerLength) {
-								// console.log('case 2a-ii')
-								// this case always applies when we have 3 visible items left
-								// if right of chosen tile, move left
-								if (index > childIndex) {
-									newTargetValue = -itemLength + scrollPosition;
+							}
+							// if removing the item means our total content will be <= one container, dual shift
+							else if (contentLength - displacedLength <= containerLength) {
+								console.log('case 2a-ii');
+
+								// if right of displaced tile, move left
+								if (index > displacedIndex) {
+									newTargetValue = -displacedLength + scrollPosition;
 								}
-								// if left of chosen tile, move right
-								if (index < childIndex) {
+								// if left of displaced tile, move right
+								if (index < displacedIndex) {
 									newTargetValue = scrollPosition;
 								}
-							} else {
-								// console.log('case 2a-iii')
-								// this case sometimes applies when we have 4 items left, depending on scrollPosition >= 65
-								// contentLength - itemLength - scrollPosition < containerLength, while contentLength - itemLength > containerLength
-								if (index > childIndex) {
-									newTargetValue =
-										-itemLength +
-										(scrollPosition -
-											(contentLength - itemLength - containerLength));
+							}
+							// if we can see last item, and removing the displaced item won't reduce contentSize to <= one container
+							else {
+								console.log('case 2a-iii');
+								// dual shifts must offset displacedLength
+								// if right of displaced tile, move left
+								if (index > displacedIndex) {
+									newTargetValue = rightListShift;
 								}
-								if (index < childIndex) {
-									newTargetValue =
-										scrollPosition -
-										(contentLength - itemLength - containerLength);
+								// if left of displaced tile, move right
+								if (index < displacedIndex) {
+									newTargetValue = leftListShift;
 								}
 							}
 						}
-
-						// where scrollPosition > itemLength
-						// this is only possible if contentLength - containerLength > itemLength
+						// where scrollPosition > displacedLength
 						else {
-							// console.log('case 3')
-							const childLength = horizontal
-								? itemSizes[childIndex]!.width
-								: itemSizes[childIndex]!.height;
-							const lastItemPosition = itemSizes[itemCount - 1 - dummyItem]!.x;
-
-							// if we can see the last item (scrollPosition + containerLength > lastItemPosition), dual shift
-							if (scrollPosition + containerLength > lastItemPosition) {
-								// must offset childLength
-								// nextScroll will be at 700 - 140 - 355 (205)
-								// console.log('case 3a')
-								const nextScrollPosition =
-									contentLength - childLength - containerLength;
-								const scrollDiff = scrollPosition - nextScrollPosition;
-								const rightListShift = -(childLength - scrollDiff);
-								const leftListShift = scrollDiff;
-								if (index > childIndex) {
+							// if we can see the last item, dual shift
+							if (lastItemVisible) {
+								console.log('case 3a');
+								// dual shifts must offset displacedLength
+								if (index > displacedIndex) {
 									newTargetValue = rightListShift;
 								}
-								if (index < childIndex) {
+								if (index < displacedIndex) {
 									newTargetValue = leftListShift;
 								}
 							} else {
-								// move right list left
-								// console.log('case 3b')
-								if (index > childIndex) {
-									newTargetValue = -childLength;
+								// if we can't see last item, and scrollPosition > displacement
+								// if right of displaced tile, move left
+								console.log('case 3b');
+								if (index > displacedIndex) {
+									newTargetValue = -displacedLength;
 								}
 							}
 						}
 					}
-
 					if (shift.targetValue !== newTargetValue) {
 						shift.targetValue = newTargetValue;
 						Animated.timing(shift.animatedValue, {
@@ -836,38 +819,6 @@ export const DraxList = <T extends unknown>({
 						? dataUpdated?.[toOriginalIndex]
 						: undefined;
 
-				// if toIndex is the lastItem in list, which is dummyItem, then return tile to 2nd to last position
-				// allows user to drag to end of list and not overshoot container
-				if (dummyItem && toOriginalIndex === itemCount - 1) {
-					resetShifts();
-					// prepare argument object
-					const draggedInfo = {
-						draggedPayload: dragged.payload,
-						draggedParentId: dragged.parentId,
-						...draggedDimensions,
-					};
-					const snapbackTarget = calculateSnapbackTarget(draggedInfo, {
-						index: toIndex! - 1,
-						originalIndex: toOriginalIndex - 1,
-					});
-					if (dataUpdated) {
-						const newOriginalIndexes = originalIndexes.slice();
-						newOriginalIndexes.splice(
-							toIndex! - 1,
-							0,
-							newOriginalIndexes.splice(fromIndex, 1)[0]
-						);
-						setOriginalIndexes(newOriginalIndexes);
-						onItemReorder?.({
-							fromIndex,
-							fromItem: dataUpdated[fromOriginalIndex],
-							toIndex: toIndex! - 1,
-							toItem: dataUpdated[toOriginalIndex - 1],
-						});
-					}
-					return { target: snapbackTarget };
-				}
-
 				if (totalDragEnd) {
 					onItemDragEnd?.({
 						...eventData,
@@ -948,10 +899,8 @@ export const DraxList = <T extends unknown>({
 			onChangeList,
 			dragExitedContainer,
 			dataUpdated,
-			dummyItem,
 			hideDummy,
 			updateShifts,
-			itemCount,
 		]
 	);
 

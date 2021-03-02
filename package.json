@@ -1,6 +1,6 @@
 {
 	"name": "@trava/react-native-drax",
-	"version": "0.7.3",
+	"version": "0.7.4",
 	"description": "A drag-and-drop system for React Native",
 	"repository": {
 		"type": "git",
